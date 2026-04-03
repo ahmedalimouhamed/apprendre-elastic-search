@@ -1,0 +1,172 @@
+#0 Nettoyage
+DELETE products_v1
+DELETE products_v2
+DELETE products_current
+DELETE products
+
+#Créer un index avec mapping
+PUT products_v1 
+{
+    "mappings": {
+        "properties": {
+            "name": {
+                "type": "text",
+                "fields": {
+                    "keyword": {"type": "keyword"}
+                }
+            },
+
+            "category": {"type": "keyword"},
+            "price": {"type": "float"},
+            "created_at": {"type": "date"}
+        }
+    }
+}
+
+#2 Ajouter des documents
+POST products_v1/_bulk
+{"index": {"_id": 1}}
+{"name": "Iphone 15 pro", "category": "smartphone", "price": 1200}
+{"index": {"_id": 2}}
+{"name": "Samsung Galaxy", "category": "smartphone", "price": 900}
+{"index": {"_id": 3}}
+{"name": "Dell Laptop", "category": "laptop", "price": 1500}
+
+
+#3 Rechercher (important)
+#full-text
+GET products_v1/_search
+{
+    "query": {
+        "match": {
+            "name": "iphone"
+        }
+    }
+}
+
+
+#filter_exact
+GET products_v1/_search
+{
+    "query": {
+        "term": {
+            "category": "smartphone"
+        }
+    }
+}
+
+#4 Tri avec keyword
+GET products_v1/_search
+{
+    "sort": [
+        {"name.keyword": "asc"}
+    ]
+}
+
+#5 Aggregation
+GET products_v1/_search
+{
+    "size": 0,
+    "aggs": {
+        "avg_price": {
+            "avg": {"field": "price"}
+        },
+        "max_price": {
+            "max": {"field": "price"}
+        }
+    }
+}
+
+#6 Alias (production)
+POST /_aliases
+{
+    "actions": [
+        {"add": {"index": "products_v1", "alias": "products"}}
+    ]
+}
+
+GET products/_search
+{
+    "query": {
+        "match_all": {}
+    }
+}
+
+#7 créer version 2 + reindex
+PUT products_v2
+{
+    "mappings": {
+        "properties": {
+            "name": {"type": "text"},
+            "category": {"type": "keyword"},
+            "price": {"type": "float"},
+            "discount": {"type": "float"}
+        }
+    }
+}
+
+POST _reindex
+{
+    "source": {"index": "products_v1"},
+    "dest": {"index": "products_v2"}
+}
+
+#switch alias (zero downtime)
+POST /_aliases
+{
+    "actions": [
+        {"remove": {"index": "products_v1", "alias": "products"}},
+        {"add": {"index": "products_v2", "alias": "products"}}
+    ]
+}
+
+#9 index Template (automatique)
+PUT _index_template/logs_template
+{
+    "index_patterns": ["logs-*"],
+    "template": {
+        "settings": {
+            "number_of_shards": 1
+        },
+        "mappings": {
+            "properties": {
+                "message": {"type": "text"},
+                "level": {"type": "keyword"}
+            }
+        }
+    }
+}
+
+#10 Tester le template
+POST logs-2026-04-03/_doc
+{
+    "message": "error occurred",
+    "level": "ERRROR"
+}
+
+#verifier mapping
+GET logs-2026-04-03/_mapping
+
+#Recherche aancé (bool)
+GET products/_search
+{
+    "query": {
+        "bool": {
+            "must": [
+                {"term": {"category": "smartphone"}}
+            ],
+
+            "filter": [
+                {"range": {"price": {"gt": 1000}}}
+            ]
+        }
+    }
+}
+
+#11 Update document
+POST products/_update/1
+{
+    "doc": {
+        "price": 1100
+    }
+}

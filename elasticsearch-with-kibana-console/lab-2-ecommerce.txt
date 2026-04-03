@@ -1,0 +1,384 @@
+#0 Nettoyage
+DELETE products_v1
+DELETE products_v2
+DELETE products_current
+DELETE products
+
+#Création template
+PUT _index_template/ecommerce_template
+{
+    "index_patterns": ["ecommerce-*"],
+    "template": {
+        "settings": {
+            "number_of_shards": 1
+        },
+        "mappings": {
+            "properties": {
+                "name": {"type": "text"}, 
+                "category": {"type": "keyword"},
+                "price": {"type": "float"},
+                "stock": {"type": "integer"},
+                "created_at": {"type": "date"}
+            }
+        }
+    }
+}
+
+
+#partie2 création index + alias
+PUT ecommerce-products-v1
+{
+    "aliases": {
+        "products": {}
+    }
+}
+
+PUT ecommerce-orders-v1
+{
+    "aliases": {
+        "orders": {}
+    }
+}
+
+
+#Partie 3 - insertion Data (bulk)
+POST products/_bulk
+{"index": {}}
+{"name": "Iphone 15", "category": "phone", "price": 1200, "stock": 10, "created_at": "2024-01-10"}
+{"index": {}}
+{"name": "Samsung S23", "category": "phone", "price": 900, "stock": 15, "created_at": "2024-02-01"}
+{"index": {}}
+{"name": "Macbook Pro", "category": "laptop", "price": 2600, "stock": 10, "created_at": "2024-03-01"}
+
+
+#Partie 4 - Recherche avancée
+#Recherche simple
+GET products/_search 
+{
+    "query": {
+        "match": {
+            "name": "iphone"
+        }
+    }
+}
+
+#2 filtre + Range
+GET products/_search
+{
+    "query": {
+        "bool": {
+            "must": [
+                {"match": {"category": "phone"}} 
+            ],
+            "filter": [
+                {"range": {"price": {"lte": 1000}}}
+            ]
+        }
+    }
+}
+
+#3 Tri
+GET products/_search
+{
+    "sort": [
+        {"price": "desc"}
+    ]
+}
+
+#Partie 5 - Aggregations
+#1- nombre de produits par categorie
+GET products/_search
+{
+    "size": 0,
+    "aggs": {
+        "by_category": {
+            "terms": {
+                "field": "category"
+            }
+        }
+    }
+}
+
+#2 prix moyen
+GET products/_search
+{
+    "size": 0,
+    "aggs": {
+        "avg_price": {
+            "avg": {
+              "field": "price"
+            }
+        }
+    }
+}
+
+#3 statistiques complètes
+GET products/_search
+{
+    "size": 0,
+    "aggs": {
+        "stats_price": {
+            "stats": {
+                "field": "price"
+            }
+        }
+    }
+}
+
+#Partie 6 - Mise à jour + script (utiliser _id)
+POST products/_update/8BrUUZ0BTfqXnZGYZIVB
+{
+    "script": {
+        "source": "ctx._source.stock += 5"
+    }
+}
+
+#Partie 7 _ Reindex (versioning réel)
+POST _reindex
+{
+    "source": {
+        "index": "products"
+    },
+    "dest": {
+        "index": "ecommerce-products-v2"
+    }
+}
+
+#Changer alias
+POST _aliases
+{
+    "actions": [
+        {"remove": {"index": "ecommerce-products-v1", "alias": "products"}},
+        {"add": {"index": "ecommerce-products-v2", "alias": "products"}}
+    ]
+}
+
+#Partie 8 - debug / Analyse index
+GET products/_mapping
+GET products/_settings
+GET _cat/indices?v
+
+#Partie 9 - suppression
+DELETE ecommerce-products-v1
+DELETE ecommerce-orders-v1
+
+# partie 10 - structure index orders
+PUT ecommerce-orders-v1
+{
+    "aliases": {
+        "orders": {}
+    },
+    "mappings": {
+        "properties": {
+            "customer": {"type": "keyword"},
+            "order_date": {"type": "date"},
+            "total": {"type": "float"},
+            "status": {"type": "keyword"},
+            "items": {
+                "type": "nested",
+                "properties": {
+                    "product_name": {
+                        "type": "text",
+                        "fields": {
+                            "keyword": { 
+                                "type": "keyword"
+                            }
+                        }
+                    },
+                    "price": {"type": "float"},
+                    "quantity": {"type": "integer"}
+                }
+            }
+        }
+    }
+}
+
+# partie 11 insertion orders
+POST orders/_bulk
+{"index": {}}
+{
+    "customer": "ahmed",
+    "order_date": "2024-03-10",
+    "status": "paid",
+    "total": 2100,
+    "items": [
+        {"product_name": "iphone 15", "price": 1200, "quantity": 1},
+        {"product_name": "samsug S23", "price": 900, "quantity": 1}
+    ]
+}
+{"index": {}}
+{
+    "customer": "sara",
+    "order_date": "2024-03-12",
+    "status": "pending",
+    "total": 2500,
+    "items": [
+        {"product_name": "Macbook Pro", "price": 2500, "quantity": 1}
+    ]
+}
+
+#Partie 12 requêtes nested
+#1 trouver commandes avec produit "iphone"
+GET orders/_search
+{
+    "query": {
+        "nested": {
+            "path": "items",
+            "query": {
+                "match": {
+                    "items.product_name": "iphone"
+                }
+            }
+        }
+    }
+}
+
+#Produit + quantité
+GET orders/_search
+{
+    "query": {
+        "nested":{
+            "path": "items",
+            "query": {
+                "bool": {
+                    "must": [
+                        {"match": {"items.product_name": "iphone"}},
+                        {"range": {"items.quantity": {"gte": 1}}}
+                    ]
+                }
+            }
+        }
+    }
+}
+
+#Partie 13 - Aggregation sur orders
+#1 Total ventes par client
+GET orders/_search
+{
+    "size": 0,
+    "aggs": {
+        "sales_by_customer": {
+            "terms":{
+                "field": "customer"
+            },
+            "aggs": {
+                "total_spent": {
+                    "sum": {
+                        "field": "total"
+                    }
+                }
+            }
+        }
+    }
+}
+
+#Nombre commandes par statuts
+GET orders/_search
+{
+    "size": 0,
+    "aggs": {
+        "by_status": {
+            "terms": {
+                "field": "status"
+            }
+        }
+    }
+}
+
+#3 Analyse par date (time series)
+GET orders/_search
+{
+    "size": 0,
+    "aggs": {
+        "sales_over_time": {
+            "date_histogram": {
+                "field": "order_date",
+                "calendar_interval": "day"
+            }
+        }
+    }
+}
+
+#Partie 14 - Nested Aggregation (niveau avancé)
+#Top produits vendus
+GET orders/_search
+{
+    "size": 0,
+    "aggs": {
+        "items_nested": {
+            "nested": {
+                "path": "items"
+            },
+            "aggs": {
+                "top_products": {
+                    "terms": {
+                        "field": "items.product_name.keyword"
+                    }
+                }
+            }
+        }
+    }
+}
+
+GET orders/_search
+
+#Partie 15 _ update Order
+POST orders/_update/9hrAUp0BTfqXnZGYA4UW
+{
+    "doc": {
+        "status": "paid"
+    }
+}
+
+GET orders/_doc/9hrAUp0BTfqXnZGYA4UW
+
+#Partie 16 - Delete By query
+POST orders/_bulk
+{"index": {}}
+{
+    "customer": "meriem",
+    "order_date": "2024-02-10",
+    "status": "pending",
+    "total": 2400,
+    "items": [
+        {"product_name": "iphone 15", "price": 1200, "quantity": 2}
+    ]
+}
+
+POST orders/_delete_by_query
+{
+    "query":{
+        "match": {
+            "status": "pending"
+        }
+    }
+}
+
+#Partie 17 - cross analysis (logique métier)
+#trouver clients qui dépensents > 2200
+GET orders/_search
+{
+    "size": 0,
+    "aggs": {
+        "rich_clients": {
+            "terms": {
+                "field": "customer"
+            },
+            "aggs": {
+                "total_spent": {
+                    "sum": {
+                        "field": "total"
+                    }
+                },
+                "filter_rich": {
+                    "bucket_selector": {
+                        "buckets_path": {
+                            "total": "total_spent"
+                        },
+                        "script": "params.total > 2200"
+                    }
+                }
+            }
+        }
+    }
+}
