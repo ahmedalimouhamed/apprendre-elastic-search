@@ -1,0 +1,273 @@
+PUT /resto_clients
+{
+    "mappings": {
+        "properties": {
+            "client_id": {"type": "integer"},
+            "nom": {"type": "text"},
+            "email": {"type": "keyword"},
+            "ville": {"type": "keyword"},
+            "fidelite_points": {"type": "integer"}
+        }
+    }
+}
+
+PUT /resto_plats
+{
+    "mappings": {
+        "properties":{
+            "plat_id": {"type": "integer"},
+            "nom_plat": {"type": "text"},
+            "categories": {"type": "keyword"},
+            "prix": {"type": "float"},
+            "vegetarien": {"type": "boolean"}
+        }
+    }
+}
+
+PUT /resto_commandes
+{
+    "mappings": {
+        "properties": {
+            "commande_id": {"type": "integer"},
+            "client_id": {"type": "integer"},
+            "table_num": {"type": "integer"},
+            "date_commande": {"type": "date"},
+            "plats": {
+                "type": "nested",
+                "properties": {
+                    "plat_id": {"type": "integer"},
+                    "quantite": {"type": "integer"}
+                }
+            },
+            "montant_total": {"type": "float"},
+            "pourboire": {"type": "float"}
+        }
+    }
+}
+
+POST /resto_clients/_doc/1
+{"client_id": 1, "nom": "Alice Martin", "email": "alice@gmail.com", "ville": "Lyon", "fidelite_poits": 120}
+
+POST /resto_clients/_doc/2
+{"client_id": 2, "nom": "Bob Durand", "email": "bob@gmail.com", "ville": "Paris", "fidelite_poits": 45}
+
+POST /resto_clients/_doc/3
+{"client_id": 3, "nom": "Charlie Dubois", "email": "charlie@gmail.com", "ville": "Marseille", "fidelite_poits": 80}
+
+POST /resto_clients/_doc/4
+{"client_id": 4, "nom": "Diana Prince", "email": "diana@gmail.com", "ville": "Lyon", "fidelite_poits": 200}
+
+POST /resto_clients/_doc/5
+{"client_id": 5, "nom": "Eve Moreau", "email": "eva@gmail.com", "ville": "Lyon", "fidelite_poits": 115}
+
+POST /resto_plats/_doc/1
+{
+    "plat_id": 1, "nom_plat": "Salade César", "categorie": "entrée", "prix": "8.5", "vegetarien": false
+}
+
+POST /resto_plats/_doc/2
+{
+    "plat_id": 2, "nom_plat": "Soupe à l'oignon", "categorie": "entrée", "prix": "6.0", "vegetarien": true
+}
+
+POST /resto_plats/_doc/3
+{
+    "plat_id": 3, "nom_plat": "Steak frites", "categorie": "entrée", "prix": "18.0", "vegetarien": false
+}
+
+POST /resto_plats/_doc/4
+{
+    "plat_id": 4, "nom_plat": "Burger végétarien", "categorie": "plat", "prix": "14.5", "vegetarien": true
+}
+
+POST /resto_plats/_doc/5
+{
+    "plat_id": 5, "nom_plat": "Tiramisu", "categorie": "dessert", "prix": "7.0", "vegetarien": true
+}
+
+POST /resto_commandes/_doc/1
+{
+    "commande_id": 101,
+    "client_id": 1,
+    "table_num": 4,
+    "date_commande": "2020-04-08T19:30:00",
+    "plats": [
+        {"plat_id": 1, "quantite": 1},
+        {"plat_id": 3, "quantite": 2}
+    ],
+    "montant_total": 44.5,
+    "pourboire": 5.0
+}
+
+POST /resto_commandes/_doc/2
+{
+    "commande_id": 102,
+    "client_id": 2,
+    "table_num": 2,
+    "date_commande": "2020-04-08T20:15:00",
+    "plats": [
+        {"plat_id": 2, "quantite": 1},
+        {"plat_id": 4, "quantite": 1},
+        {"plat_id": 5, "quantite": 1}
+    ],
+    "montant_total": 27.5,
+    "pourboire": 3.0
+}
+
+POST /resto_commandes/_doc/3
+{
+    "commande_id": 103,
+    "client_id": 3,
+    "table_num": 8,
+    "date_commande": "2020-04-08T12:00:00",
+    "plats": [
+        {"plat_id": 3, "quantite": 1}
+    ],
+    "montant_total": 18.5,
+    "pourboire": 2.0
+}
+
+POST /resto_commandes/_doc/2
+{
+    "commande_id": 104,
+    "client_id": 1,
+    "table_num": 4,
+    "date_commande": "2020-04-09T13:15:00",
+    "plats": [
+        {"plat_id": 4, "quantite": 2}
+    ],
+    "montant_total": 29.0,
+    "pourboire": 0.0
+}
+
+POST /resto_commandes/_doc/5
+{
+    "commande_id": 105,
+    "client_id": 5,
+    "table_num": 6,
+    "date_commande": "2020-04-09T20:00:00",
+    "plats": [
+        {"plat_id": 2, "quantite": 1},
+        {"plat_id": 3, "quantite": 1},
+        {"plat_id": 5, "quantite": 1}
+    ],
+    "montant_total": 31.5,
+    "pourboire": 4.0
+}
+
+GET /resto_commandes/_search
+{
+    "query": {
+        "term": {"client_id": 1}
+    }
+}
+
+GET /resto_commandes/_search
+{
+    "query": {
+        "range": {
+            "date_commande": {
+                "gte": "2020-04-09",
+                "lt": "2020-04-10"
+            }
+        }
+    }
+}
+
+GET /resto_commandes/_search
+{
+    "query": {
+        "range": {"pourboire": {"gte": 3}}
+    }
+}
+
+GET /resto_plats/_search
+{
+    "query": {
+        "match": {"nom_plat": "burger"}
+    }
+}
+
+GET /resto_clients/_search
+{
+    "query": {"term": {"ville": "Lyon"}},
+    "_source": "client_id"
+}
+
+GET /resto_commandes/_search
+{
+    "query": {
+        "terms": {
+            "client_id": [1,3,5]
+        }
+    }
+}
+
+GET /resto_commandes/_search
+{
+    "size": 0,
+    "aggs": {
+        "ca_total": {"sum": {"field": "montant_total"}}
+    }
+}
+
+GET /resto_commandes/_search
+{
+    "size": 0,
+    "aggs": {
+        "par_jour": {
+            "date_histogram":{
+                "field": "date_commande",
+                "calendar_interval": "day"
+            },
+            "aggs": {
+                "ca_jour": {"sum": {"field": "montant_total"}}
+            }
+        }
+    }
+}
+
+GET /resto_commandes/_search
+{
+    "size": 0,
+    "aggs": {
+        "plats_nested": {
+            "nested": {"path": "plats"},
+            "aggs": {
+                "par_plat_id": {
+                    "terms": {"field": "plats.plat_id", "size": 10},
+                    "aggs": {
+                        "total_quantitie": {"sum": {"field": "plats.quantite"}}
+                    }
+                }
+            }
+        }
+    }
+}
+
+GET /resto_commandes/_search
+{
+    "size": 0,
+    "aggs": {
+        "par_table": {
+            "terms": {"field": "table_num"},
+            "aggs": {
+                "montant_moyen": {"avg": {"field": "montant_total"}}
+            }
+        }
+    }
+}
+
+GET /resto_commandes/_search
+{
+    "size": 0,
+    "aggs": {
+        "par_heure": {
+            "date_histogram": {
+                "field": "date_commande",
+                "calendar_interval": "hour",
+                "format": "HH"
+            }
+        }
+    }
+}
